@@ -35,11 +35,29 @@ def pull_classroom_data(treatment_var = 'Ba03_AnyTreat',
 	class_data = pd.merge(class_data, d4, on = 'Center_ID')
 
 	# Add previous version of response to cts features
-	response_var = response.split('_')[1:]
-	response_var.insert(0, 'Ba03')
-	response_var = ('_').join(response_var)
-	if response_var not in cts_features and response_var in class_data.columns:
-		cts_features = cts_features + [response_var]
+	if response == 'test_score':
+		# There are no test scores prior to 2005, so we include
+		# all language literacy variables
+		classroom_scores = pull_classroom_test_averages()
+		class_data = pd.merge(
+			class_data, classroom_scores,
+			left_on = 'Center_ID', right_on = 'center_id' 
+
+		)
+		cts_features += [
+				'Ba03_print_knowledge',
+				'Ba03_literacy_resources',
+				'Ba03_oral_language',
+				'Ba03_print_motivation'
+		]
+
+	else:
+		# For language literacy variables, we include the prior version
+		response_var = response.split('_')[1:]
+		response_var.insert(0, 'Ba03')
+		response_var = ('_').join(response_var)
+		if response_var not in cts_features and response_var in class_data.columns:
+			cts_features = cts_features + [response_var]
 
 	# Ignore the truly irrelevant columns
 	all_cols = [treatment_var, response] + to_binarize + cts_features 
@@ -154,3 +172,25 @@ def pull_student_data(treatment_var = 'Ba03_AnyTreat',
 
 	# Return
 	return X, y
+
+
+def pull_classroom_test_averages():
+
+	# Pull raw data
+	d1 = read_data(1)
+	d2 = read_data(2)
+	d2['Ba03_TeacherEduc'] = d2['Ba03_TeacherEduc'].replace(' ', '0')
+	d3 = read_data(3)
+	d4 = read_data(4)
+
+	# Need center id to merge
+	d1 = d1.loc[d1['Chld_B_Stndzd'].apply(isfloatable)]
+	d1['Chld_B_Stndzd'] = d1['Chld_B_Stndzd'].astype('float32')
+	avgs = d1.groupby(['center_id'])['Chld_B_Stndzd'].mean()
+	avgs.name = 'test_score'
+	return avgs
+
+
+if __name__ == '__main__':
+
+	X, y = pull_classroom_data(response = 'test_score')
