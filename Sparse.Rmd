@@ -1,0 +1,53 @@
+---
+title: "sparse"
+author: "Asher Spector"
+date: "11/3/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dummy)
+```
+
+## Loading Data
+
+```{r}
+# Individual level data
+ds1 <- read_tsv('raw/DS0001/31061-0001-Data.tsv')
+# Classroom, 2003
+ds2 <- read_tsv('raw/DS0002/31061-0002-Data.tsv')
+# Classroom, 2004
+ds3 <- read_tsv('raw/DS0003/31061-0003-Data.tsv')
+# Classroom, 2005
+ds4 <- read_tsv('raw/DS0004/31061-0004-Data.tsv')
+# Individual, follow-up
+ds5 <- read_tsv('raw/DS0005/31061-0005-Data.tsv')
+```
+```{r}
+# Begin with anytreat analysis
+class_data <- dplyr::inner_join(ds2, ds3, by= 'Center_ID')
+L0.columns <- c('Ba03_Arnett_PosPunDet', 'Ba03_oral_language')
+L1.columns <- c('Ba03_Block') # We assume no interaction effect at this level
+response <- 'Yr04_oral_language'
+
+# Feature construction
+all.columns <- c(L0.columns, L1.columns, response)
+
+# Create dummies for categorical variables
+processed_data <- class_data %>%
+  select(all.columns)
+processed_data[L1.columns] <- lapply(processed_data[L1.columns], factor)
+one_hots <- dummy(x = processed_data)
+processed_data <- bind_cols(processed_data, one_hots) %>%
+  select(-one_of(L1.columns))
+
+# Create interaction variables
+interaction_vars <- processed_data %>%
+  select(c(L0.columns)) %>%
+  mutate()
+
+
+```
+
+
