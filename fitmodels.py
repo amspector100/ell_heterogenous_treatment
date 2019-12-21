@@ -113,6 +113,11 @@ def main(args):
 					help='If true, will refit responses (default: False)',
 					default = 'False')
 
+	parser.add_argument('--latex', dest = 'latex',
+					type=str,
+					help='If true, will print datasets in latexed format (default: False)',
+					default = 'False')
+
 	parser.add_argument('--bootstrap', dest = 'bootstrap',
 					type=str,
 					help='If true, do bootstrap lasso feature statistic (default: False)',
@@ -123,6 +128,11 @@ def main(args):
 					help='Which response to fit. (Default: "all")',
 					default = 'all')
 
+	parser.add_argument('--fitprop', dest = 'fitprop',
+					type=float,
+					help='How much data to use to fit the model. (Default: 1)',
+					default = 1)
+
 
 	# Parse args, including some boolean flags
 	args = parser.parse_args()
@@ -130,6 +140,7 @@ def main(args):
 	refit = args.refit
 	args.bootstrap = str2bool(args.bootstrap)
 	bootstrap = args.bootstrap
+	args.latex = str2bool(args.latex)
 
 	print(f"Parsed args are {args}")
 
@@ -165,19 +176,102 @@ def main(args):
 	for response in responses:
 		print(f'\n -----------{response}---------- ')
 		if not refit:
-			print(pd.read_csv(f'results/{response}.csv'))
+			data = pd.read_csv(f'results/{response}.csv')
+			if not args.latex:
+				print(data)
+			else:
+
+				# Make pretty for latex
+				rename_vars = {}
+				for ind in data['Unnamed: 0']:
+					name = str(ind)
+					name = name.replace('Ba03_', '2003_')
+					if 'desc_lang2' in name:
+						name = 'Pct Spanish Speaking'
+						if 'interaction' in ind:
+							name += ' (interaction)'
+
+					if 'AnyTreat' in name:
+						name = 'Treatment'
+
+
+					if 'TeacherEdu' in name:
+						if '4_' in name:
+							name = 'Teacher Edu (College)'
+						if '3_' in name:
+							name = 'Teacher Edu (Some College)'
+						if '2_' in name:
+							name = 'Teacher Edu (HS+CDA)'
+
+
+						if 'interaction' in ind:
+							name += ' (interaction)'
+
+					rename_vars[ind] = name
+
+				# Rename
+				data['Unnamed: 0'] = data['Unnamed: 0'].apply(lambda x: rename_vars[x])
+				data = data.drop(['lasso', 'variable'], axis='columns')
+				data = data.rename(
+					columns={'Unnamed: 0':"Variable", "onestep":"point",
+							 'upper_confidence':'upper', 'lower_confidence':'lower'}
+				)
+				data = data.set_index('Variable')
+				data = np.around(data, 3)
+
+				# Save
+				data.to_latex(f'results/tex/{response}-latex.tex')
 
 		# For each response, cross validate to get l1/l2
 		else:
 			X, y = pull_classroom_data(response = response)
-			l1, l2 = full_grid_search(X, y)
 
-			# Now apply postselective lasso using
-			# selectinf package
-			k = PostSelectiveLasso(X, y, l1 = l1, l2 = l2)
-			selective_lasso_output = k.fit()
-			columns = [c for c in selective_lasso_output.columns if 'trunc' not in c]
-			selective_lasso_output[columns].to_csv(f'results/{response}.csv')
+
+			if args.fitprop == 1:
+				outpath = f'results/{response}.csv'
+				l1, l2 = full_grid_search(X, y)
+
+				# Now apply postselective lasso using
+				# selectinf package
+				k = PostSelectiveLasso(X, y, l1 = l1, l2 = l2)
+				selective_lasso_output = k.fit()
+				columns = [c for c in selective_lasso_output.columns if 'trunc' not in c]
+				selective_lasso_output[columns].to_csv(outpath)
+
+			else:
+
+				fitprop = args.fitprop
+				if fitprop == -1:
+					fitprops = [0.73, 0.76, 0.8, 0.85]
+				else:
+					fitprops = [fitprop]
+
+				# Select random subset of the data for PAPE estimation
+				for fitp in fitprops:
+					n = X.shape[0]
+					num_obs = int(X.shape[0]*fitp)
+					rand_inds = np.arange(0, n, 1)
+
+					# Set seed, shuffle
+					np.random.seed(186)
+					np.random.shuffle(rand_inds)
+					rand_inds = rand_inds[0:num_obs]
+					Xsub = X.loc[rand_inds]
+					ysub = y.loc[rand_inds]
+
+					# Output path
+					outpath = f'results/fitprop/{response}_fitprop{fitp}.csv'
+
+
+
+					l1, l2 = full_grid_search(Xsub, ysub)
+
+					# Now apply postselective lasso using
+					# selectinf package
+					k = PostSelectiveLasso(Xsub, ysub, l1 = l1, l2 = l2)
+					selective_lasso_output = k.fit()
+					columns = [c for c in selective_lasso_output.columns if 'trunc' not in c]
+					selective_lasso_output[columns].to_csv(outpath)
 
 		if bootstrap:
 

@@ -32,10 +32,10 @@ def full_grid_search(X, y, grid_size = 10):
 
 	# Parameter grid
 	n = X.shape[0]
-	l1s = np.logspace(-1.5, 1.5, grid_size, base = 4)
+	l1s = np.logspace(-1.5, 1, grid_size, base = 4)
 	# l1s = np.flip(l1s) Doesn't change outcomes - the model
 	# is truly picking up signal :)
-	l2s = np.logspace(-1.5, 1.5, grid_size, base = 4)
+	l2s = np.logspace(-1.5, 1, grid_size, base = 4)
 
 	# Grid search
 	best_l1 = 20

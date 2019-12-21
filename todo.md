@@ -83,3 +83,16 @@ e.g. lower educational level but not above
 Go through literature and acknowledge need:
 1. Peope saying there's a need
 2. Meta-analyses are a bad method
+
+
+# Thoughts on why our analysis is cool
+
+1. Because we analyze all possible interaction terms and automatically select this one, we can conclude that this is the **causal reason** there are heterogenous treatment effects. 
+
+E.g., other analyses showed that there's some difference in treatment effects between subgroups. This particular analysis 
+
+Note that the linear model is not even 
+identifiable in this case, because there are more covariates than data points. 
+
+# Future work
+1. Identify

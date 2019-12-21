@@ -1,6 +1,12 @@
 import numpy as np
 import pandas as pd
 
+
+import warnings
+warnings.simplefilter("ignore")
+from plotnine import *
+warnings.resetwarnings()
+
 # Helper
 def isfloatable(x):
     try:
@@ -190,7 +196,77 @@ def pull_classroom_test_averages():
 	avgs.name = 'test_score'
 	return avgs
 
+def plot_covariate_balance():
+
+	# Pull data
+	X, _ = pull_classroom_data(response = 'test_score')
+	X.columns = [c.replace('Ba03_','') for c in X.columns]
+	X = X.drop(
+		[c for c in X.columns if 'interaction' in c or 'Block' in c],
+		axis = 'columns'
+	)
+	X = X.drop('Arnett_PosPunDet', axis='columns')
+	# 5_2003_TeacherEduc means missing
+	X = X.drop(['intercept', '5_TeacherEduc'], axis='columns')
+	X = X.rename(
+		columns = {
+		'2_TeacherEduc':'Teacher Edu (HS + CDA)',
+		'3_TeacherEduc':'Teacher Edu (Some College)',
+		'4_TeacherEduc':'Teacher Edu (College)',
+		'desc_lang2':'% Spanish Speaking',
+		'AnyTreat':"Treatment",
+		}
+		)
+	X.columns = [c + ' (2003)' if '_' in c else c for c in X.columns]
+	X = X.melt(id_vars = ['Treatment'])
+	X['Treatment'] = X['Treatment'] == 1
+
+	# Plot covariate balance
+	g = (ggplot(X, aes(
+		y = 'value', x = 'variable', fill = 'Treatment',
+		group = 'Treatment'
+	))
+		+ stat_summary(geom = 'col', position=position_dodge(width=0.9))
+		+ labs(title = 'Covariate Balance in Project Upgrade', 
+			   x = 'Variable', y = 'Value')
+		+ coord_flip()
+	)
+	g.save('figures/identification/covbal.JPG')
+
+
+def interpret_effect_sizes():
+	""" Get an idea of what 1 std deviation is """
+
+	pre_responses = [
+		'Ba03_print_knowledge',
+		'Ba03_literacy_resources',
+		'Ba03_oral_language',
+		'Ba03_print_motivation'
+	]
+
+	d2 = read_data(2)
+	d3 = read_data(3)
+	d2['Ba03_TeacherEduc'] = d2['Ba03_TeacherEduc'].replace(' ', '5')
+	class_data = pd.merge(d2, d3, on = 'Center_ID')
+
+	# See what means look like before standardizing...
+	out2 = class_data[pre_responses].mean()
+
+	# Standardize
+	class_data[pre_responses] = (class_data[pre_responses] - class_data[pre_responses].mean())/class_data[pre_responses].std()
+
+	# Groupby and print
+	out = class_data.groupby(['Ba03_TeacherEduc'])[pre_responses].mean()
+	print(out)
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
 
-	X, y = pull_classroom_data(response = 'test_score')
+	interpret_effect_sizes()
+	plot_covariate_balance()
